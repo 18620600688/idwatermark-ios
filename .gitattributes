@@ -1,0 +1,11 @@
+# 统一用 LF，否则 shell 脚本在 macOS runner 上会因 \r 报错
+* text=auto eol=lf
+*.sh text eol=lf
+*.swift text eol=lf
+*.html text eol=lf
+*.yml text eol=lf
+*.plist text eol=lf
+*.md text eol=lf
+*.js text eol=lf
+*.py text eol=lf
+*.png binary
