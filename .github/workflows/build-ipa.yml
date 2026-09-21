@@ -5,6 +5,9 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-14
@@ -27,3 +30,12 @@ jobs:
           path: IDWatermark.ipa
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish IPA to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: 身份证加水印 build-${{ github.run_number }}
+          body: "自动编译：IPA 无签名，用 TrollStore（巨魔）安装。手机可直接从本页下载。"
+          files: IDWatermark.ipa
+          fail_on_unmatched_files: true
