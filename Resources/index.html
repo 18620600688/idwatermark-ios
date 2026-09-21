@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<title>身份证加水印</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    background: #f0f2f5; color: #1f2937;
+    -webkit-user-select: none; user-select: none;
+    padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+  header {
+    background: #3b82f6; color: #fff;
+    padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+    display: flex; align-items: baseline; justify-content: space-between;
+  }
+  header h1 { font-size: 19px; font-weight: 600; }
+  header span { font-size: 11px; color: #dbeafe; }
+
+  main { padding: 12px 12px 4px; }
+  .card {
+    background: #fff; border-radius: 14px; padding: 14px;
+    margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.07);
+  }
+  .card > h2 { font-size: 13px; color: #6b7280; font-weight: 500; margin-bottom: 10px; }
+
+  /* 选择照片 */
+  #dropZone {
+    text-align: center; padding: 34px 16px;
+    border: 2px dashed #c7d2fe; background: #f5f8ff;
+    border-radius: 14px; color: #3b82f6; font-size: 16px; font-weight: 500;
+  }
+  #dropZone p { font-size: 11px; color: #9ca3af; margin-top: 6px; font-weight: 400; }
+  #dropZone .big { font-size: 30px; display: block; margin-bottom: 6px; }
+
+  /* 预览 */
+  .preview {
+    background: #eef1f5; border-radius: 10px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center; min-height: 160px;
+  }
+  #previewCanvas { max-width: 100%; max-height: 44vh; display: block; }
+  .pager { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; font-size: 12px; color: #6b7280; }
+  .pager button {
+    background: #f1f5f9; border: none; border-radius: 8px; padding: 7px 14px;
+    font-size: 13px; color: #374151; font-family: inherit;
+  }
+  .pager button:disabled { opacity: .4; }
+
+  /* 输入 */
+  input[type="text"] {
+    width: 100%; padding: 11px 12px; font-size: 16px; font-family: inherit;
+    border: 1px solid #e2e8f0; border-radius: 10px; background: #fbfcfe; color: #1f2937;
+    -webkit-user-select: text; user-select: text;
+  }
+  input[type="text"]:focus { outline: none; border-color: #3b82f6; background: #fff; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip {
+    background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;
+    border-radius: 16px; padding: 6px 12px; font-size: 12px;
+  }
+  .chip:active { background: #dbeafe; color: #2563eb; border-color: #bfdbfe; }
+
+  /* 分段控件 */
+  .seg { display: flex; background: #f1f5f9; border-radius: 10px; padding: 3px; gap: 3px; }
+  .seg button {
+    flex: 1; border: none; background: transparent; border-radius: 8px;
+    padding: 9px 4px; font-size: 13px; color: #475569; font-family: inherit;
+  }
+  .seg button.on { background: #fff; color: #2563eb; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+
+  .row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .row .lab { font-size: 13px; color: #6b7280; width: 62px; flex: none; }
+  .row .val { font-size: 13px; color: #2563eb; width: 48px; text-align: right; flex: none; }
+  input[type="range"] { flex: 1; height: 30px; -webkit-appearance: none; background: transparent; }
+  input[type="range"]::-webkit-slider-runnable-track { height: 4px; background: #e2e8f0; border-radius: 2px; }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 24px; height: 24px; border-radius: 50%;
+    background: #fff; border: 2px solid #3b82f6; margin-top: -10px; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  }
+
+  /* 颜色 */
+  .colors { display: flex; gap: 10px; align-items: center; }
+  .sw {
+    width: 34px; height: 34px; border-radius: 50%; border: 2px solid #fff;
+    box-shadow: 0 0 0 1px #d8dee8; position: relative;
+  }
+  .sw.on::after {
+    content: "✓"; position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; color: #fff; font-size: 15px; text-shadow: 0 1px 2px rgba(0,0,0,.5);
+  }
+  .sw.white.on::after { color: #3b82f6; text-shadow: none; }
+  .sw.custom { display: flex; align-items: center; justify-content: center; font-size: 16px; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
+  .sw.custom input { position: absolute; width: 100%; height: 100%; opacity: 0; }
+
+  /* 底部操作条 */
+  footer {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: rgba(255,255,255,.96);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    border-top: 1px solid #e8ebf0;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    display: flex; gap: 8px;
+  }
+  footer button {
+    flex: 1; border: none; border-radius: 11px; padding: 13px 6px;
+    font-size: 15px; font-family: inherit; font-weight: 500;
+  }
+  footer button.primary { background: #3b82f6; color: #fff; }
+  footer button.primary:active { background: #2563eb; }
+  footer button.ghost { background: #f1f5f9; color: #374151; flex: 0 0 auto; padding-left: 14px; padding-right: 14px; }
+  footer button:disabled { opacity: .45; }
+
+  /* toast */
+  #toast {
+    position: fixed; left: 50%; bottom: calc(110px + env(safe-area-inset-bottom));
+    transform: translateX(-50%) translateY(10px);
+    background: rgba(17,24,39,.92); color: #fff; font-size: 14px;
+    padding: 10px 18px; border-radius: 20px; opacity: 0;
+    transition: opacity .2s, transform .2s; pointer-events: none; max-width: 80vw; text-align: center;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🪪 身份证加水印</h1>
+  <span>本地处理 · 不联网</span>
+</header>
+
+<main>
+  <section class="card" style="padding:0;background:transparent;box-shadow:none">
+    <div id="dropZone">
+      <span class="big">📷</span>
+      轻点这里选择照片
+      <p>可一次选多张，图片不会离开本机</p>
+    </div>
+    <input id="fileInput" type="file" accept="image/*" multiple hidden>
+  </section>
+
+  <section class="card" id="previewCard" hidden>
+    <h2>预览</h2>
+    <div class="preview"><canvas id="previewCanvas"></canvas></div>
+    <div class="pager">
+      <button id="prevBtn">‹ 上一张</button>
+      <span id="pagerInfo">第 1 / 1 张</span>
+      <button id="nextBtn">下一张 ›</button>
+    </div>
+  </section>
+
+  <section class="card" id="settingsCard" hidden>
+    <h2>水印文字</h2>
+    <input id="wmText" type="text" value="仅供办理业务使用" placeholder="例如：仅供XX银行开户使用">
+    <div class="chips" id="chips"></div>
+
+    <h2 style="margin-top:16px">样式</h2>
+    <div class="seg" id="styleSeg">
+      <button data-v="tile" class="on">平铺重复</button>
+      <button data-v="single">单个大字</button>
+    </div>
+
+    <h2 style="margin-top:16px">颜色</h2>
+    <div class="colors" id="colors"></div>
+
+    <div class="row"><span class="lab">透明度</span><input id="sOpacity" type="range" min="5" max="100" value="35"><span class="val" id="vOpacity">35%</span></div>
+    <div class="row"><span class="lab">字号</span><input id="sSize" type="range" min="10" max="100" value="40"><span class="val" id="vSize">40</span></div>
+    <div class="row"><span class="lab">旋转</span><input id="sAngle" type="range" min="-90" max="90" value="-30"><span class="val" id="vAngle">-30°</span></div>
+
+    <h2 style="margin-top:16px">格式</h2>
+    <div class="seg" id="fmtSeg">
+      <button data-v="jpeg" class="on">JPG（体积小）</button>
+      <button data-v="png">PNG（无损）</button>
+    </div>
+  </section>
+</main>
+
+<footer id="bar" hidden>
+  <button id="saveBtn" class="primary">存入相册</button>
+  <button id="allBtn" class="primary">全部存相册</button>
+  <button id="shareBtn" class="ghost">分享</button>
+</footer>
+<div id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var bridge = (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.idwm) || null;
+
+  var images = [];      // {name, bitmap|img, w, h}
+  var cur = 0;
+  var style = 'tile';
+  var fmt = 'jpeg';
+  var color = '#ff0000';
+  var COLORS = [
+    { c: '#ff0000', n: '红' }, { c: '#ffffff', n: '白' },
+    { c: '#000000', n: '黑' }, { c: '#3b82f6', n: '蓝' }
+  ];
+  var PRESETS = ['仅供办理业务使用', '仅供XX银行开户使用', '仅供XX平台实名认证使用',
+                 '仅供租房使用，他用无效', '仅供求职应聘使用', '复印无效'];
+  var PRESET_SHORT = ['办理业务', '银行开户', '实名认证', '租房', '求职', '复印无效'];
+
+  // ---------- toast ----------
+  var toastTimer = null;
+  function toast(msg, ms) {
+    var el = $('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('show'); }, ms || 1800);
+  }
+  // 原生回调
+  window.__nativeResult = function (status, message) {
+    toast(message || (status === 'ok' ? '已存入相册' : '操作失败'), status === 'ok' ? 1600 : 2800);
+  };
+
+  // ---------- 预设芯片 ----------
+  (function buildChips() {
+    var box = $('chips');
+    PRESET_SHORT.forEach(function (label, i) {
+      var b = document.createElement('div');
+      b.className = 'chip';
+      b.textContent = label;
+      b.addEventListener('click', function () { $('wmText').value = PRESETS[i]; render(); });
+      box.appendChild(b);
+    });
+  })();
+
+  // ---------- 颜色 ----------
+  (function buildColors() {
+    var box = $('colors');
+    COLORS.forEach(function (o) {
+      var d = document.createElement('div');
+      d.className = 'sw' + (o.c === '#ffffff' ? ' white' : '') + (o.c === color ? ' on' : '');
+      d.style.background = o.c;
+      d.title = o.n;
+      d.addEventListener('click', function () {
+        color = o.c;
+        [].forEach.call(box.querySelectorAll('.sw'), function (e) { e.classList.remove('on'); });
+        d.classList.add('on');
+        render();
+      });
+      box.appendChild(d);
+    });
+    var custom = document.createElement('div');
+    custom.className = 'sw custom';
+    custom.innerHTML = '<input type="color" value="#ff0000">';
+    var picker = custom.querySelector('input');
+    picker.addEventListener('input', function () {
+      color = picker.value;
+      custom.style.background = color;
+      [].forEach.call(box.querySelectorAll('.sw'), function (e) { e.classList.remove('on'); });
+      custom.classList.add('on');
+      render();
+    });
+    box.appendChild(custom);
+  })();
+
+  // ---------- 分段控件 ----------
+  function seg(id, cb) {
+    var box = $(id);
+    box.addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      [].forEach.call(box.querySelectorAll('button'), function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      cb(b.getAttribute('data-v'));
+    });
+  }
+  seg('styleSeg', function (v) { style = v; render(); });
+  seg('fmtSeg', function (v) { fmt = v; });
+
+  // ---------- 滑杆 ----------
+  function slider(id, vlabel, fmtFn, cb) {
+    var s = $(id), v = $(vlabel);
+    function upd() { v.textContent = fmtFn(s.value); cb(parseFloat(s.value)); }
+    s.addEventListener('input', upd);
+    upd();
+  }
+  var opacity = 0.35, sizeRatio = 0.4, angle = -30;
+  slider('sOpacity', 'vOpacity', function (v) { return v + '%'; }, function (v) { opacity = v / 100; render(); });
+  slider('sSize', 'vSize', function (v) { return v; }, function (v) { sizeRatio = v / 100; render(); });
+  slider('sAngle', 'vAngle', function (v) { return v + '°'; }, function (v) { angle = v; render(); });
+
+  $('wmText').addEventListener('input', render);
+
+  // ---------- 选图 ----------
+  $('dropZone').addEventListener('click', function () { $('fileInput').click(); });
+  $('fileInput').addEventListener('change', function (e) {
+    var files = [].slice.call(e.target.files || []);
+    if (!files.length) return;
+    loadFiles(files);
+    e.target.value = '';
+  });
+
+  function loadFiles(files) {
+    var pending = files.length, start = images.length;
+    files.forEach(function (f) {
+      decode(f).then(function (res) {
+        images.push({ name: f.name.replace(/\.[^.]+$/, ''), src: res.src, sw: res.sw, sh: res.sh,
+                      o: res.o, w: res.w, h: res.h });
+      }, function () {
+        toast('有图片打不开：' + f.name, 2400);
+      }).then(function () {
+        if (--pending === 0) {
+          if (images.length > start) {
+            cur = start;
+            $('previewCard').hidden = false;
+            $('settingsCard').hidden = false;
+            $('bar').hidden = false;
+            render(true);
+          }
+        }
+      });
+    });
+  }
+
+  // ---------- EXIF 方向（手机拍照必须处理，否则图片会躺着） ----------
+  function exifOrientation(buf) {
+    try {
+      var v = new DataView(buf);
+      if (v.byteLength < 4 || v.getUint16(0, false) !== 0xFFD8) return 1; // 非 JPEG
+      var off = 2, len = v.byteLength;
+      while (off + 4 < len) {
+        var marker = v.getUint16(off, false);
+        off += 2;
+        if ((marker & 0xFF00) !== 0xFF00) break;
+        var size = v.getUint16(off, false);
+        off += 2;
+        if (marker === 0xFFE1) {
+          if (v.getUint16(off, false) !== 0x4578) return 1; // 不是 "Ex"
+          var little = v.getUint16(off + 6, false) === 0x4949;
+          // off 指向 "Exif\0\0"，TIFF 头从 off+6 开始，IFD0 偏移在 TIFF 头第 4 字节（off+10）
+          var dirStart = off + 6 + v.getUint32(off + 10, little);
+          if (dirStart + 2 > len) return 1;
+          var entries = v.getUint16(dirStart, little);
+          for (var i = 0; i < entries; i++) {
+            var e = dirStart + 2 + i * 12;
+            if (e + 12 > len) break;
+            if (v.getUint16(e, little) === 0x0112) {
+              var val = v.getUint16(e + 8, little);
+              return (val >= 1 && val <= 8) ? val : 1;
+            }
+          }
+          return 1;
+        }
+        if (size < 2) break;
+        off += size - 2;
+      }
+    } catch (err) { /* 忽略，按正常方向处理 */ }
+    return 1;
+  }
+
+  // 按 EXIF 方向把图绘制到目标矩形
+  function drawUpright(ctx, item, dx, dy, dw, dh) {
+    var o = item.o, sw = item.sw, sh = item.sh;
+    ctx.save();
+    switch (o) {
+      case 2: ctx.translate(dx + dw, dy); ctx.scale(-1, 1); break;
+      case 3: ctx.translate(dx + dw, dy + dh); ctx.rotate(Math.PI); break;
+      case 4: ctx.translate(dx, dy + dh); ctx.scale(1, -1); break;
+      case 5: ctx.translate(dx, dy); ctx.rotate(-Math.PI / 2); ctx.scale(-1, 1); break;
+      case 6: ctx.translate(dx + dw, dy); ctx.rotate(Math.PI / 2); break;
+      case 7: ctx.translate(dx + dw, dy + dh); ctx.rotate(Math.PI / 2); ctx.scale(-1, 1); break;
+      case 8: ctx.translate(dx, dy + dh); ctx.rotate(-Math.PI / 2); break;
+      default: ctx.translate(dx, dy);
+    }
+    ctx.drawImage(item.src, 0, 0, sw, sh);
+    ctx.restore();
+  }
+
+  // 解码：ArrayBuffer 读方向 + blob URL 加载（iOS 14 全部支持，不必 createImageBitmap）
+  function decode(file) {
+    var readBuf = (file.arrayBuffer ? file.arrayBuffer() : Promise.reject(new Error('no arrayBuffer')));
+    return readBuf.then(function (buf) {
+      var o = exifOrientation(buf);
+      return loadImg(file, o);
+    }, function () {
+      return loadImg(file, 1);
+    });
+  }
+
+  function loadImg(file, o) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var sw = img.naturalWidth, sh = img.naturalHeight;
+        var swap = o >= 5;
+        resolve({ src: img, sw: sw, sh: sh, o: o, w: swap ? sh : sw, h: swap ? sw : sh });
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error('decode failed'));
+      };
+      img.src = url;
+    });
+  }
+
+  // ---------- 渲染 ----------
+  var _job = null;
+  function render(immediate) {
+    if (!images.length) return;
+    if (_job) clearTimeout(_job);
+    _job = setTimeout(draw, immediate ? 0 : 60);
+  }
+
+  function draw() {
+    _job = null;
+    var item = images[cur];
+    var canvas = $('previewCanvas');
+    var MAXW = Math.min(window.innerWidth - 60, 900);
+    var MAXH = Math.max(160, window.innerHeight * 0.44);
+    var k = Math.min(MAXW / item.w, MAXH / item.h, 1);
+    var pw = Math.max(1, Math.round(item.w * k)), ph = Math.max(1, Math.round(item.h * k));
+    canvas.width = pw; canvas.height = ph;
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, pw, ph);
+    drawUpright(ctx, item, 0, 0, pw, ph);
+    var text = ($('wmText').value || '水印').trim();
+
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.translate(pw / 2, ph / 2);
+    ctx.rotate(angle * Math.PI / 180);
+    if (style === 'single') {
+      var fs = Math.min(pw, ph) * (0.09 + sizeRatio * 0.13);
+      ctx.font = 'bold ' + fs + 'px "PingFang SC", -apple-system, sans-serif';
+      ctx.fillText(text, 0, 0);
+    } else {
+      var tfs = Math.min(pw, ph) * (0.026 + sizeRatio * 0.042);
+      ctx.font = tfs + 'px "PingFang SC", -apple-system, sans-serif';
+      var stepX = Math.max(ctx.measureText(text).width + tfs * 2.4, tfs * 5);
+      var stepY = tfs * 3.8;
+      var D = Math.sqrt(pw * pw + ph * ph) / 2 + stepX;
+      var row = 0;
+      for (var y = -D; y <= D; y += stepY, row++) {
+        var off = (row % 2 === 0) ? 0 : stepX / 2;
+        for (var x = -D + off; x <= D; x += stepX) ctx.fillText(text, x, y);
+      }
+    }
+    ctx.restore();
+
+    $('pagerInfo').textContent = '第 ' + (cur + 1) + ' / ' + images.length + ' 张';
+    $('prevBtn').disabled = images.length < 2;
+    $('nextBtn').disabled = images.length < 2;
+  }
+
+  $('prevBtn').addEventListener('click', function () {
+    cur = (cur - 1 + images.length) % images.length; render(true);
+  });
+  $('nextBtn').addEventListener('click', function () {
+    cur = (cur + 1) % images.length; render(true);
+  });
+  window.addEventListener('resize', function () { render(true); });
+
+  // ---------- 输出 ----------
+  function fullCanvas(item) {
+    var c = document.createElement('canvas');
+    c.width = item.w; c.height = item.h;
+    var ctx = c.getContext('2d');
+    drawUpright(ctx, item, 0, 0, item.w, item.h);
+    var text = ($('wmText').value || '水印').trim();
+    var W = item.w, H = item.h;
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.translate(W / 2, H / 2);
+    ctx.rotate(angle * Math.PI / 180);
+    if (style === 'single') {
+      var fs = Math.min(W, H) * (0.09 + sizeRatio * 0.13);
+      ctx.font = 'bold ' + fs + 'px "PingFang SC", -apple-system, sans-serif';
+      ctx.fillText(text, 0, 0);
+    } else {
+      var tfs = Math.min(W, H) * (0.026 + sizeRatio * 0.042);
+      ctx.font = tfs + 'px "PingFang SC", -apple-system, sans-serif';
+      var stepX = Math.max(ctx.measureText(text).width + tfs * 2.4, tfs * 5);
+      var stepY = tfs * 3.8;
+      var D = Math.sqrt(W * W + H * H) / 2 + stepX;
+      var row = 0;
+      for (var y = -D; y <= D; y += stepY, row++) {
+        var off = (row % 2 === 0) ? 0 : stepX / 2;
+        for (var x = -D + off; x <= D; x += stepX) ctx.fillText(text, x, y);
+      }
+    }
+    ctx.restore();
+    return c;
+  }
+
+  function safeName(s) {
+    return (s || '水印').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 20) || '水印';
+  }
+
+  function dataUrlOf(canvas) {
+    return fmt === 'png' ? canvas.toDataURL('image/png')
+                         : canvas.toDataURL('image/jpeg', 0.92);
+  }
+
+  function extOf() { return fmt === 'png' ? 'png' : 'jpg'; }
+
+  function sendToNative(action, dataUrl, name, label) {
+    if (!bridge) {
+      // 桌面浏览器兜底
+      var a = document.createElement('a');
+      a.href = dataUrl; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      toast('已开始下载');
+      return Promise.resolve();
+    }
+    try {
+      bridge.postMessage({ action: action, data: dataUrl, name: name });
+      if (label) toast(label);
+    } catch (err) {
+      toast('调用原生失败：' + err.message, 2600);
+    }
+    return new Promise(function (r) { setTimeout(r, 700); });
+  }
+
+  function busy(on) {
+    ['saveBtn', 'allBtn', 'shareBtn'].forEach(function (id) { $(id).disabled = !!on; });
+  }
+
+  $('saveBtn').addEventListener('click', function () {
+    if (!images.length) return;
+    busy(true);
+    var item = images[cur];
+    var canvas = fullCanvas(item);
+    var name = item.name + '_水印_' + safeName($('wmText').value) + '.' + extOf();
+    sendToNative('photos', dataUrlOf(canvas), name, '正在存入相册…');
+    setTimeout(function () { busy(false); }, 900);
+  });
+
+  $('shareBtn').addEventListener('click', function () {
+    if (!images.length) return;
+    busy(true);
+    var item = images[cur];
+    var canvas = fullCanvas(item);
+    var name = item.name + '_水印_' + safeName($('wmText').value) + '.' + extOf();
+    sendToNative('share', dataUrlOf(canvas), name);
+    setTimeout(function () { busy(false); }, 900);
+  });
+
+  $('allBtn').addEventListener('click', function () {
+    if (!images.length) return;
+    busy(true);
+    var i = 0;
+    var step = function () {
+      if (i >= images.length) {
+        busy(false);
+        toast('已提交 ' + images.length + ' 张到相册', 2200);
+        return;
+      }
+      var item = images[i];
+      var canvas = fullCanvas(item);
+      var name = item.name + '_水印_' + safeName($('wmText').value) + '.' + extOf();
+      sendToNative('photos', dataUrlOf(canvas), name, null).then(function () {
+        i++;
+        toast('正在处理 ' + i + ' / ' + images.length + ' …', 900);
+        setTimeout(step, 350);
+      });
+    };
+    step();
+  });
+})();
+</script>
+</body>
+</html>

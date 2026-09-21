@@ -1,0 +1,13 @@
+# 构建产物
+build/
+*.ipa
+*.dSYM/
+DerivedData/
+work/
+
+# 临时样例
+s*.jpg
+build_sample_*.jpg
+
+.DS_Store
+Thumbs.db
