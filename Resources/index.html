@@ -357,9 +357,11 @@
     return 1;
   }
 
-  // 按 EXIF 方向把图绘制到目标矩形
+  // 按 EXIF 方向把图绘制到目标矩形（含等比缩放）
   function drawUpright(ctx, item, dx, dy, dw, dh) {
     var o = item.o, sw = item.sw, sh = item.sh;
+    // o>=5 时宽高互换：画布高对应源宽，画布宽对应源高
+    var k = (o >= 5 ? dh : dw) / sw;
     ctx.save();
     switch (o) {
       case 2: ctx.translate(dx + dw, dy); ctx.scale(-1, 1); break;
@@ -371,6 +373,7 @@
       case 8: ctx.translate(dx, dy + dh); ctx.rotate(-Math.PI / 2); break;
       default: ctx.translate(dx, dy);
     }
+    ctx.scale(k, k);
     ctx.drawImage(item.src, 0, 0, sw, sh);
     ctx.restore();
   }
